@@ -1,0 +1,19 @@
+[package]
+name = "nevidita"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = { version = "0.13.0" }
+bevy-inspector-egui = "0.23.3"
+bevy_ecs_tilemap = { git= "https://github.com/rparrett/bevy_ecs_tilemap.git", branch="bevy13"}
+
+# Enable a small amount of optimization in debug mode
+[profile.dev]
+opt-level = 0
+
+# Enable high optimizations for dependencies (incl. Bevy), but not for our code:
+[profile.dev.package."*"]
+opt-level = 3
