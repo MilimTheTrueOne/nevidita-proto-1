@@ -1,7 +1,3 @@
-#![allow(unused)]
-
-use std::default;
-
 use bevy::{
     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
     prelude::*,
@@ -14,17 +10,21 @@ fn main() {
     let mut app = App::new();
 
     app.insert_resource(Msaa::Off)
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "Nevidita".into(),
-                name: Some("nevidita.app".into()),
-                present_mode: PresentMode::Immediate,
-                ..default()
-            }),
-            ..default()
-        }))
+        .add_plugins(
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Nevidita".into(),
+                        name: Some("nevidita.app".into()),
+                        present_mode: PresentMode::Immediate,
+                        ..default()
+                    }),
+                    ..default()
+                })
+                .set(ImagePlugin::default_nearest()),
+        )
         .add_plugins(TilemapPlugin)
-        .add_systems(Startup, (startup, spawn_map))
+        .add_systems(Startup, (startup, spawn_map, spawn_unit).chain())
         .insert_resource(CurrentMap::default());
 
     #[cfg(debug_assertions)]
@@ -39,7 +39,10 @@ fn main() {
 }
 
 fn startup(mut commands: Commands) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2dBundle {
+        transform: Transform::from_scale(Vec3::new(0.5, 0.5, 0.5)),
+        ..default()
+    });
 }
 
 #[derive(Resource, Reflect)]
@@ -52,9 +55,9 @@ pub struct CurrentMap {
 impl Default for CurrentMap {
     fn default() -> Self {
         Self {
-            height: 5,
-            width: 5,
-            fields: vec![Field::Passable; 25],
+            height: 10,
+            width: 10,
+            fields: vec![Field::Passable; 100],
         }
     }
 }
@@ -73,7 +76,7 @@ impl CurrentMap {
 pub enum Field {
     #[default]
     Passable = 1,
-    Impassable = 3,
+    Impassable = 2,
 }
 
 pub mod flags {
@@ -131,4 +134,112 @@ fn spawn_map(mut commands: Commands, map: Res<CurrentMap>, asset_server: ResMut<
         transform: get_tilemap_center_transform(&map_size, &grid_size, &map_type, 0.0),
         ..Default::default()
     });
+}
+
+fn spawn_unit(
+    mut commands: Commands,
+    tile_map: Query<Entity, With<TileStorage>>,
+    asset_server: ResMut<AssetServer>,
+) {
+    let guardian: Handle<Image> = asset_server.load("shield.png");
+    let fighter: Handle<Image> = asset_server.load("sword.png");
+    let striker: Handle<Image> = asset_server.load("bow.png");
+
+    let guardian_enemy: Handle<Image> = asset_server.load("shield-enemy.png");
+    let fighter_enemy: Handle<Image> = asset_server.load("sword-enemy.png");
+    let striker_enemy: Handle<Image> = asset_server.load("bow-enemy.png");
+
+    let map = tile_map.single();
+
+    // spawn allied units
+    commands
+        .spawn(SpriteBundle {
+            transform: Transform::from_xyz(0.0, 0.0, 1.0),
+            texture: striker,
+            ..default()
+        })
+        .insert((Operator::STRIKER, flags::Ally))
+        .set_parent(map)
+        .insert(Name::new("STRIKER"))
+        .commands()
+        .spawn(SpriteBundle {
+            transform: Transform::from_xyz(4.0 * 16.0, 4.0 * 16.0, 1.0),
+            texture: fighter,
+            ..default()
+        })
+        .insert((Operator::FIGHTER, flags::Ally))
+        .insert(Name::new("FIGHTER"))
+        .set_parent(map)
+        .commands()
+        .spawn(SpriteBundle {
+            transform: Transform::from_xyz(32.0, 32.0, 1.0),
+            texture: guardian,
+            ..default()
+        })
+        .insert((Operator::GUARDIAN, flags::Ally))
+        .insert(Name::new("GUARDIAN"))
+        .set_parent(map);
+
+    commands
+        .spawn(SpriteBundle {
+            transform: Transform::from_xyz(9.0 * 16.0, 9.0 * 16.0, 1.0),
+            texture: striker_enemy,
+            ..default()
+        })
+        .insert((Operator::STRIKER, flags::Enemy))
+        .insert(Name::new("STRIKER ENEMY"))
+        .set_parent(map)
+        .commands()
+        .spawn(SpriteBundle {
+            transform: Transform::from_xyz(5.0 * 16.0, 5.0 * 16.0, 1.0),
+            texture: fighter_enemy,
+            ..default()
+        })
+        .insert((Operator::FIGHTER, flags::Enemy))
+        .insert(Name::new("FIGHTER ENEMY"))
+        .set_parent(map)
+        .commands()
+        .spawn(SpriteBundle {
+            transform: Transform::from_xyz(7.0 * 16.0, 7.0 * 16.0, 1.0),
+            texture: guardian_enemy,
+            ..default()
+        })
+        .insert((Operator::GUARDIAN, flags::Enemy))
+        .insert(Name::new("GUARDIAN ENEMY"))
+        .set_parent(map);
+}
+
+#[derive(Component)]
+struct Operator {
+    hp: f32,
+    def: f32,
+    atk: f32,
+    mov: f32,
+    rag: f32,
+}
+
+impl Operator {
+    const GUARDIAN: Self = Self {
+        hp: 200.0,
+        def: 0.5,
+        atk: 50.0,
+        mov: 16.0,
+        rag: 16.0,
+    };
+
+    const FIGHTER: Self = Self {
+        hp: 150.0,
+        def: 0.1,
+        atk: 100.0,
+        mov: 48.0,
+        rag: 16.0,
+    };
+
+    const STRIKER: Self = Self {
+        hp: 100.0,
+        def: 0.0,
+        atk: 75.0,
+        mov: 32.0,
+        rag: 64.0,
+    };
 }
